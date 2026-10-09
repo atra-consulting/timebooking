@@ -1,0 +1,52 @@
+# Automated dependency updates via Dependabot (modelled on atra-homepage).
+#
+# npm in frontend/ and backend/, weekly. Minor/patch bumps are bundled into
+# ONE pull request, Angular majors as a coupled family (see groups).
+#
+# Note: there is no CI. Before merging a Dependabot PR, run in each directory
+# `npm ci && npm test && npm run build` locally.
+#
+# Why `cooldown`: the most common npm attack is a hijacked maintainer account
+#   publishing a malicious NEW version. Such versions are usually spotted and
+#   unpublished within hours to days; with a cooldown they never show up as a
+#   PR. Applies to version updates only, security updates (from Dependabot
+#   alerts) still arrive immediately.
+version: 2
+updates:
+  - package-ecosystem: 'npm'
+    directories:
+      - '/frontend'
+      - '/backend'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '06:00'
+      timezone: 'Europe/Berlin'
+    open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
+      semver-patch-days: 5
+      semver-minor-days: 7
+      semver-major-days: 14
+    commit-message:
+      prefix: 'chore(deps)'
+      prefix-development: 'chore(deps-dev)'
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - 'minor'
+          - 'patch'
+      # Angular packages are coupled through peerDependencies and not
+      # installable one by one. Majors need `ng update` (migrations) anyway,
+      # so the PR is a reminder rather than a ready merge candidate.
+      angular-major:
+        applies-to: version-updates
+        update-types:
+          - 'major'
+        patterns:
+          - '@angular/*'
+          - '@angular-devkit/*'
+          - 'angular-calendar'
+          - 'typescript'
+      # Majors outside the group get one PR each.
