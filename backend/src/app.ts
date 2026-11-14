@@ -8,6 +8,10 @@ import authRoutes from './routes/auth.routes.js';
 import calendarRoutes from './routes/calendar.routes.js';
 import storageRoutes from './routes/storage.routes.js';
 import { issueXsrfCookie, XSRF_COOKIE_NAME } from './middleware/csrf.middleware.js';
+import { ensurePrivateDir } from './session-dir.js';
+
+// Session files hold Google OAuth tokens; see ensurePrivateDir().
+const SESSION_DIR = './sessions';
 
 function limitFromEnv(name: string, fallback: number): number {
   const raw = process.env[name];
@@ -64,14 +68,18 @@ export function createApp() {
   app.use('/auth', authLimiter);
   app.use('/api', apiLimiter);
 
+  // In tests the default in-memory store keeps the suite hermetic
+  // (no ./sessions file writes, no file-store reaper timers).
+  const useFileStore = process.env.NODE_ENV !== 'test';
+  if (useFileStore) ensurePrivateDir(SESSION_DIR);
+
   app.use(session({
-    // In tests the default in-memory store keeps the suite hermetic
-    // (no ./sessions file writes, no file-store reaper timers).
-    store: process.env.NODE_ENV === 'test' ? undefined : new FileStore({
-      path: './sessions',
-      ttl: 7 * 24 * 60 * 60, // 7 days in seconds
-      fileMode: 0o600,
-    }),
+    store: useFileStore
+      ? new FileStore({
+          path: SESSION_DIR,
+          ttl: 7 * 24 * 60 * 60, // 7 days in seconds
+        })
+      : undefined,
     secret: process.env.SESSION_SECRET!,
     resave: false,
     saveUninitialized: false,
