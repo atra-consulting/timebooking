@@ -12,9 +12,12 @@ export async function listEvents(tokens: Credentials, params: EventListParams) {
   const auth = createOAuth2Client();
   auth.setCredentials(tokens);
 
-  let refreshedTokens: Credentials | null = null;
+  // A holder object instead of a `let`: the callback assigns asynchronously,
+  // and control-flow analysis would otherwise keep a `let` narrowed to its
+  // initial `null` at the read below.
+  const refreshed: { tokens?: Credentials } = {};
   auth.on('tokens', (newTokens) => {
-    refreshedTokens = { ...newTokens };
+    refreshed.tokens = { ...newTokens };
   });
 
   const calendar = google.calendar({ version: 'v3', auth });
@@ -29,7 +32,7 @@ export async function listEvents(tokens: Credentials, params: EventListParams) {
   });
 
   // Merge refreshed tokens with original tokens to preserve refresh_token
-  const newTokens = refreshedTokens ? { ...tokens, ...refreshedTokens } : auth.credentials;
+  const newTokens = refreshed.tokens ? { ...tokens, ...refreshed.tokens } : auth.credentials;
 
   const events = (res.data.items ?? [])
     .filter(e => e.start?.dateTime && e.end?.dateTime)
